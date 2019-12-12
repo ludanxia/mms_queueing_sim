@@ -53,13 +53,13 @@ class ClientSim:
         self.waiting_timestamp = waiting_timestamp
         pass
     
-    def waitingTime(self):
+    def waiting_time(self):
         return self.serving_timestamp - self.waiting_timestamp
 
-    def servingTime(self):
+    def serving_time(self):
         return self.leaving_timestamp - self.serving_timestamp
 
-    def stayingTime(self):
+    def staying_time(self):
         return self.leaving_timestamp - self.waiting_timestamp
 
     
@@ -77,13 +77,13 @@ class ServerSim:
         self.serving_rate = serving_rate
         pass
 
-    def updateStatus(self, current_time):
+    def update_status(self, current_time):
         if self.serving_time_elapsed == self.serving_time and self.status == BUSY:
             self.current_client.leaving_timestamp = current_time
             client_index = self.current_client.client_index
-            waiting_time = self.current_client.waitingTime()
-            serving_time = self.current_client.servingTime()
-            staying_time = self.current_client.stayingTime()
+            waiting_time = self.current_client.waiting_time()
+            serving_time = self.current_client.serving_time()
+            staying_time = self.current_client.staying_time()
             self.status = IDLE
             self.serving_time = 0
             self.serving_time_elapsed = 0
@@ -94,7 +94,7 @@ class ServerSim:
                 self.serving_time_elapsed = self.serving_time_elapsed + 1
         return -1, -1, -1, -1
 
-    def newClient(self, current_time, new_client):
+    def create_client(self, current_time, new_client):
         self.serving_time = int(np.random.exponential(self.serving_rate))
         while self.serving_time == 0:
             self.serving_time = int(np.random.exponential(self.serving_rate))
@@ -130,7 +130,7 @@ class QueueSim:
             # Check if current service is end
             finish_status_updated = False
             for srv in self.servers:
-                index, waiting_time, serving_time, staying_time = srv.updateStatus(t)
+                index, waiting_time, serving_time, staying_time = srv.update_status(t)
                 if not (index == -1 and waiting_time == -1 and serving_time == -1 and staying_time == -1):
                     self.finish_list.append([index, waiting_time, serving_time, staying_time])
                     finish_status_updated = True
@@ -148,7 +148,7 @@ class QueueSim:
             for srv in self.servers:
                 if srv.status == IDLE:
                     if self.waiting_queue.qsize():
-                        srv.newClient(t, self.waiting_queue.get())
+                        srv.create_client(t, self.waiting_queue.get())
 
             if visualize:
                 if self.finish_list:
