@@ -1,22 +1,28 @@
 clear;clc
-arriving_rate = 0.1:0.001:4.9;
+arriving_rate = 0.1:0.01:4.9;
 serving_rate = 1;
 opt_values = zeros(1, length(arriving_rate));
 opt_ss = zeros(1, length(arriving_rate));
-x = -2:2;
-x = 2.^x;
+opt_w = zeros(1, length(arriving_rate));
+opt_c = zeros(1, length(arriving_rate));
+theta = [0, 1, 2];
+x = [30, 40, 50]/60;
 name = [];
-for i = 1:length(x)
-    for j=1:length(arriving_rate)
-        [opt_values(j), opt_ss(j)] = optimize_num(arriving_rate(j), serving_rate, 10, x(i));
+for i = 1:length(theta)
+    for j = 1:length(x)
+        for k=1:length(arriving_rate)
+            [opt_values(k), opt_ss(k), opt_w(k), opt_c(k)] = optimize_num(arriving_rate(k), serving_rate, 10, x(j), theta(i));
+        end
+        plot(arriving_rate, opt_ss)
+        hold on
+        name = [name; string("x="+x(j)+", \theta ="+theta(i))];
     end
-    plot(arriving_rate, opt_ss)
-    name = [name; string("x="+x(i))];
-    hold on
 end
-legend(name)
+xlabel("\lambda / \mu")
+ylabel("r_{opt}")
+legend(name, 'location', 'bestoutside')
 
-function [opt_v, opt_s] = optimize_num(arrv, serv, s_max, x)
+function [opt_v, opt_s, opt_W, opt_C] = optimize_num(arrv, serv, s_max, x, theta)
     a = arrv ./ serv;
     s = 0:s_max-1;
     sum_s = a.^(s - s_max) ./ factorial(s);
@@ -24,8 +30,10 @@ function [opt_v, opt_s] = optimize_num(arrv, serv, s_max, x)
     s = ceil(a):s_max;
     x_s = (s-a).^2 .* factorial(s-1) .* sum_s(s) + s - a;
     W = 1 ./ serv .* (1 + 1 ./ x_s);
-    C = x.*(s+1);
-    L = W + C;
+    C = x.* s;
+    L = W + theta * C;
     [opt_v, opt_s] = min(L);
+    opt_W = W(opt_s);
+    opt_C = C(opt_s);
     opt_s = opt_s + ceil(a) - 1;
 end
