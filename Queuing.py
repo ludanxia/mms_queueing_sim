@@ -30,6 +30,7 @@ Declaration of class Queuing:
     max_queue_len: maximum queue length
     timer: the current time. Initialized with 0 at the beginning
 '''
+
 UNDEF = -1
 WAITING = 0
 LEFT = 1
@@ -114,6 +115,8 @@ class QueueSim:
     max_queue_len = 0
     servers = []
     finish_list = []
+    queue_len_list = []
+    lost_list = []
 
     def __init__(self, arriving_rate, serving_rate, server_num, max_queue_len=0):
         self.arriving_rate = arriving_rate
@@ -125,15 +128,13 @@ class QueueSim:
             self.servers.append(new_server)
         pass
 
-    def simulate(self, duration=100, visualize=True):
+    def simulate(self, duration=100):
         for t in range(duration):
             # Check if current service is end
-            finish_status_updated = False
             for srv in self.servers:
                 index, waiting_time, serving_time, staying_time = srv.update_status(t)
                 if not (index == -1 and waiting_time == -1 and serving_time == -1 and staying_time == -1):
                     self.finish_list.append([index, waiting_time, serving_time, staying_time])
-                    finish_status_updated = True
 
             # New clients come
             arriving_client_num = np.random.poisson(self.arriving_rate)
@@ -142,7 +143,10 @@ class QueueSim:
                     new_client = ClientSim(self.client_index, WAITING, t)
                     new_client.waiting_timestamp = t
                     self.client_index = self.client_index + 1
-                    self.waiting_queue.put(new_client)
+                    if self.waiting_queue.qsize() < self.max_queue_len or self.max_queue_len == 0:
+                        self.waiting_queue.put(new_client)
+                    else:
+                        self.lost_list.append([t, new_client.client_index])
 
             # Arrange clients to idle servers
             for srv in self.servers:
@@ -150,20 +154,49 @@ class QueueSim:
                     if self.waiting_queue.qsize():
                         srv.create_client(t, self.waiting_queue.get())
 
-            if visualize:
-                if self.finish_list:
-                    if finish_status_updated:
-                        print("ClientIndex:{} Waiting:{} Serving:{} Staying:{} QueueLength:{}".format(
-                            self.finish_list[-1][0],
-                            self.finish_list[-1][1],
-                            self.finish_list[-1][2],
-                            self.finish_list[-1][3],
-                            self.waiting_queue.qsize()))
+            self.queue_len_list.append([t, self.waiting_queue.qsize()])
 
-        return self.finish_list
+        return self.finish_list, self.queue_len_list, self.lost_list
+
+    def show_clients(self):
+        if self.finish_list:
+            for fl in self.finish_list:
+                print("ClientIndex:{} Waiting:{} Serving:{} Staying:{}".format(
+                    fl[0], fl[1], fl[2], fl[3]))
+
+    def show_queue(self):
+        if self.queue_len_list:
+            for qll in self.queue_len_list:
+                print("Time: {} QueueLength: {}".format(qll[0], qll[1]))
+
+    def show_lost(self):
+        if self.lost_list:
+            for ll in self.lost_list:
+                print("Time:{} LostClientIndex:{}".format(ll[0], ll[1]))
+
+    def mean_queue_len(self):
+        if self.queue_len_list:
+            queue_len = [x[1] for x in self.queue_len_list]
+            return sum(queue_len) / len(queue_len)
+        else:
+            return -1
+
+    def mean_time(self):
+        if self.finish_list:
+            wt_list = [x[1] for x in self.finish_list]
+            srv_list = [x[2] for x in self.finish_list]
+            st_list = [x[3] for x in self.finish_list]
+            return sum(wt_list) / len(wt_list), sum(srv_list) / len(srv_list), sum(st_list) / len(st_list)
+        else:
+            return -1, -1, -1
 
 
 if __name__ == "__main__":
-    queue_sim = QueueSim(0.5, 2, 2)
-    res = queue_sim.simulate(1000)
-    print("----------Simulation ends here----------")
+    queue_sim = QueueSim(0.01, 60, 1)
+    (res_finish, res_queue_len, res_lost_list) = queue_sim.simulate(7200)
+    mean_queue_length = queue_sim.mean_queue_len()
+    mean_waiting_time, mean_serving_time, mean_staying_time = queue_sim.mean_time()
+    print("------------------------Statistics------------------------")
+    print(" MeanQueueLength:{} \n MeanWaitingTime:{} \n MeanServingTime:{} \n MeanStayingTime:{}".format(
+        mean_queue_length, mean_waiting_time, mean_serving_time, mean_staying_time
+    ))
